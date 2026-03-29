@@ -1,0 +1,15 @@
+__pycache__/
+*.pyc
+*.pyo
+.env
+.venv/
+venv/
+*.egg-info/
+.DS_Store
+
+# Keep model artifacts tracked (small-ish .pkl files)
+# Uncomment if you prefer not to commit them:
+# models/*.pkl
+
+# Large data files
+data/*.csv
