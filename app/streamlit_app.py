@@ -1,11 +1,12 @@
 """
-app/streamlit_app.py
-────────────────────
-Streamlit UI for Early Chronic Kidney Disease Detection.
-Users fill in patient lab values, pick a model, and receive
-a prediction with confidence, clinical flags, and a risk badge.
+app/streamlit_app.py  [UPDATED]
+────────────────────────────────
+Changes vs original:
+  - Sidebar leaderboard now shows Sensitivity, Specificity, Brier Score
+    alongside the existing F1 Score, Accuracy, ROC-AUC columns.
+  - All other UI is unchanged.
 
-Run from the project root:
+Run from project root:
     streamlit run app/streamlit_app.py
 """
 
@@ -24,7 +25,6 @@ from src.predict import (
 )
 from src.preprocess import CLINICAL_THRESHOLDS
 
-# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="CKD Early Detection",
     page_icon="🫁",
@@ -32,43 +32,28 @@ st.set_page_config(
     initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
 st.markdown("""
 <style>
-    /* Main background */
     .main { background-color: #f7f9fc; }
-
-    /* Metric cards */
     div[data-testid="metric-container"] {
         background: white;
         border-radius: 10px;
         padding: 12px 16px;
         box-shadow: 0 2px 8px rgba(0,0,0,0.07);
     }
-
-    /* Risk badge */
     .badge-high     { background:#e74c3c; color:white; border-radius:20px; padding:6px 18px; font-weight:700; font-size:1rem; }
     .badge-moderate { background:#f39c12; color:white; border-radius:20px; padding:6px 18px; font-weight:700; font-size:1rem; }
     .badge-low      { background:#27ae60; color:white; border-radius:20px; padding:6px 18px; font-weight:700; font-size:1rem; }
-
-    /* Result banner */
     .result-ckd    { background:#fde8e8; border-left:5px solid #e74c3c; padding:16px; border-radius:8px; }
     .result-nocd   { background:#e8f8f1; border-left:5px solid #27ae60; padding:16px; border-radius:8px; }
-
-    /* Section headers */
     .section-head  { font-size:1.05rem; font-weight:700; color:#2c3e50; margin-bottom:6px; }
-
-    /* Clinical flag row */
     .flag-row { background:#fff8e1; border-radius:6px; padding:8px 12px; margin:4px 0;
                 border-left:4px solid #f39c12; font-size:0.9rem; }
-
-    /* Divider */
     hr { border: none; border-top: 1px solid #e0e0e0; margin: 20px 0; }
 </style>
 """, unsafe_allow_html=True)
 
 
-# ── Load artefacts ────────────────────────────────────────────────────────────
 @st.cache_resource(show_spinner="Loading models…")
 def load_artefacts():
     available   = list_available_models(MODELS_DIR)
@@ -91,27 +76,35 @@ with st.sidebar:
         "Choose a classifier",
         options=available_models,
         index=available_models.index(best_model_name) if best_model_name in available_models else 0,
-        help="All models are pre-trained on 1 659 patients. Best by F1 is highlighted."
+        help="All models are pre-trained on 1,659 patients. Best by F1 is highlighted."
     )
-
     st.markdown(f"🏆 **Best model (F1):** `{best_model_name}`")
     st.markdown("---")
 
-    # Model scorecard
+    # ── UPDATED: full 8-metric leaderboard ───────────────────────────────────
     st.subheader("📊 Model Leaderboard")
+
     display_df = results_df.copy().reset_index(drop=True)
     display_df.index = display_df.index + 1
     display_df["Model"] = display_df["Model"].apply(
         lambda m: f"⭐ {m}" if m == best_model_name else m
     )
-    st.dataframe(
-        display_df[["Model", "F1 Score", "Accuracy", "ROC-AUC"]],
-        use_container_width=True,
-        hide_index=False,
-    )
+
+    # Format percentage cols and Brier Score separately
+    pct_cols   = ["Accuracy", "Precision", "Sensitivity", "Specificity", "F1 Score", "ROC-AUC"]
+    brier_col  = "Brier Score"
+
+    formatted = display_df[["Model"] + pct_cols + [brier_col]].copy()
+    for col in pct_cols:
+        formatted[col] = formatted[col].apply(lambda v: f"{v:.1f}%")
+    formatted[brier_col] = formatted[brier_col].apply(lambda v: f"{v:.4f} ↓")
+
+    st.dataframe(formatted, use_container_width=True, hide_index=False)
+    st.caption("Sensitivity = Recall (TPR) · Specificity = TNR · Brier Score: ↓ lower is better")
+    # ─────────────────────────────────────────────────────────────────────────
 
     st.markdown("---")
-    st.caption("⚠️ This tool is for research / educational use only.\nNot a substitute for medical diagnosis.")
+    st.caption("⚠️ For research / educational use only. Not a substitute for medical diagnosis.")
 
 
 # ── Main content ──────────────────────────────────────────────────────────────
@@ -122,7 +115,6 @@ st.markdown(
 )
 st.markdown("---")
 
-# ── Patient Input Form ────────────────────────────────────────────────────────
 st.subheader("📋 Patient Lab Values")
 
 with st.form("patient_form"):
@@ -174,7 +166,6 @@ with st.form("patient_form"):
 # ── Process & Display Result ──────────────────────────────────────────────────
 if submitted:
     with st.spinner("Running inference…"):
-        # Parse encoded dropdowns
         gender_val    = int(gender.split("(")[1].replace(")", ""))
         ethnicity_val = int(ethnicity.split("(")[1].replace(")", ""))
         smoking_val   = int(smoking.split("(")[1].replace(")", ""))
@@ -211,7 +202,6 @@ if submitted:
     st.markdown("---")
     st.subheader("📣 Diagnosis Result")
 
-    # ── Result banner
     if result["prediction"] == 1:
         st.markdown(
             f"""<div class="result-ckd">
@@ -225,28 +215,22 @@ if submitted:
         st.markdown(
             f"""<div class="result-nocd">
             <h2 style="margin:0;color:#1e8449">✅ {result['label']}</h2>
-            <p style="margin:4px 0 0">The model found <strong>no significant indicators</strong> of Chronic Kidney Disease
-            based on the provided values. Routine monitoring is still recommended.</p>
+            <p style="margin:4px 0 0">The model found <strong>no significant indicators</strong> of Chronic Kidney Disease.
+            Routine monitoring is still recommended.</p>
             </div>""",
             unsafe_allow_html=True
         )
 
     st.markdown("<br>", unsafe_allow_html=True)
 
-    # ── Key metrics
     m1, m2, m3, m4 = st.columns(4)
     m1.metric("CKD Probability",  f"{result['ckd_probability']}%")
     m2.metric("Model Confidence", f"{result['confidence']}%")
-
     risk = result["risk_level"]
     badge_class = {"High": "badge-high", "Moderate": "badge-moderate", "Low": "badge-low"}[risk]
-    m3.markdown(
-        f"**Risk Level**<br><span class='{badge_class}'>{risk}</span>",
-        unsafe_allow_html=True
-    )
+    m3.markdown(f"**Risk Level**<br><span class='{badge_class}'>{risk}</span>", unsafe_allow_html=True)
     m4.metric("Model Used", result["model_used"])
 
-    # ── Clinical flags
     st.markdown("---")
     flags = result["clinical_flags"]
     if flags:
@@ -261,18 +245,17 @@ if submitted:
                 unsafe_allow_html=True,
             )
     else:
-        st.success("✅ No clinical thresholds breached — all measured values are within reference ranges.")
+        st.success("✅ No clinical thresholds breached — all measured values within reference ranges.")
 
-    # ── Disclaimer
     st.markdown("---")
     st.caption(
         "⚠️ **Medical Disclaimer:** This prediction is generated by a machine learning model "
-        "trained on a research dataset. It is intended for educational and research purposes only. "
-        "It does **not** constitute medical advice and should never replace a qualified physician's evaluation."
+        "trained on a research dataset. For educational and research purposes only. "
+        "Does not constitute medical advice."
     )
 
 
-# ── Info section at the bottom (when no submission yet) ───────────────────────
+# ── Info section (no submission yet) ─────────────────────────────────────────
 if not submitted:
     st.markdown("---")
     col_a, col_b = st.columns(2)
@@ -284,31 +267,25 @@ This app uses five machine-learning classifiers trained on **1,659 patient recor
 to detect early Chronic Kidney Disease.
 
 **Models included:**
-- 🟢 XGBoost
-- 🟢 Gradient Boosting
-- 🟢 Random Forest
-- 🟢 AdaBoost
-- 🟢 SVM (RBF kernel)
+- 🟢 XGBoost · Gradient Boosting · Random Forest · AdaBoost · SVM
 
-Features used span demographics, kidney-function markers, blood panel results,
-and risk-factor indicators.
+**Evaluation metrics used:**
+- Accuracy, Precision, **Sensitivity** (TPR), **Specificity** (TNR)
+- F1 Score, ROC-AUC, **Brier Score** (calibration)
         """)
 
     with col_b:
         st.subheader("🔬 Key Clinical Markers")
         ref_data = {
-            "Marker"    : ["GFR", "Serum Creatinine", "BUN", "Protein in Urine", "ACR", "HbA1c", "Hemoglobin", "BMI"],
+            "Marker"    : ["GFR", "Serum Creatinine", "BUN", "Protein in Urine",
+                            "ACR", "HbA1c", "Hemoglobin", "BMI"],
             "Threshold" : ["< 60", "> 1.2", "> 20", "> 0.3", "≥ 30", "≥ 6.5", "< 12", "≥ 30"],
-            "Unit"      : ["mL/min/1.73m²", "mg/dL", "mg/dL", "g/day", "mg/g", "%", "g/dL", "kg/m²"],
+            "Unit"      : ["mL/min/1.73m²", "mg/dL", "mg/dL", "g/day",
+                            "mg/g", "%", "g/dL", "kg/m²"],
             "Significance": [
-                "Reduced kidney function",
-                "Elevated creatinine",
-                "Elevated BUN",
-                "Pathological proteinuria",
-                "Increased albuminuria",
-                "Diabetic range",
-                "Anemia of CKD",
-                "Obesity risk factor",
+                "Reduced kidney function", "Elevated creatinine", "Elevated BUN",
+                "Pathological proteinuria", "Increased albuminuria", "Diabetic range",
+                "Anemia of CKD", "Obesity risk factor",
             ]
         }
         st.dataframe(pd.DataFrame(ref_data), use_container_width=True, hide_index=True)
