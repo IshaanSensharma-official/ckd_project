@@ -78,33 +78,61 @@ with st.sidebar:
         index=available_models.index(best_model_name) if best_model_name in available_models else 0,
         help="All models are pre-trained on 1,659 patients. Best by F1 is highlighted."
     )
+
     st.markdown(f"🏆 **Best model (F1):** `{best_model_name}`")
     st.markdown("---")
 
-    # ── UPDATED: full 8-metric leaderboard ───────────────────────────────────
+    # ── UPDATED: full metrics leaderboard ───────────────────────────────────
     st.subheader("📊 Model Leaderboard")
 
     display_df = results_df.copy().reset_index(drop=True)
     display_df.index = display_df.index + 1
+
     display_df["Model"] = display_df["Model"].apply(
         lambda m: f"⭐ {m}" if m == best_model_name else m
     )
 
-    # Format percentage cols and Brier Score separately
-    pct_cols   = ["Accuracy", "Precision", "Sensitivity", "Specificity", "F1 Score", "ROC-AUC"]
-    brier_col  = "Brier Score"
+    # FIXED: Sensitivity → Recall
+    pct_cols = [
+        "Accuracy",
+        "Precision",
+        "Recall",
+        "Specificity",
+        "F1 Score",
+        "ROC-AUC"
+    ]
+
+    brier_col = "Brier Score"
 
     formatted = display_df[["Model"] + pct_cols + [brier_col]].copy()
-    for col in pct_cols:
-        formatted[col] = formatted[col].apply(lambda v: f"{v:.1f}%")
-    formatted[brier_col] = formatted[brier_col].apply(lambda v: f"{v:.4f} ↓")
 
-    st.dataframe(formatted, use_container_width=True, hide_index=False)
-    st.caption("Sensitivity = Recall (TPR) · Specificity = TNR · Brier Score: ↓ lower is better")
-    # ─────────────────────────────────────────────────────────────────────────
+    for col in pct_cols:
+        formatted[col] = formatted[col].apply(
+            lambda v: f"{v:.1f}%"
+        )
+
+    formatted[brier_col] = formatted[brier_col].apply(
+        lambda v: f"{v:.4f} ↓"
+    )
+
+    st.dataframe(
+        formatted,
+        use_container_width=True,
+        hide_index=False
+    )
+
+    st.caption(
+        "Recall = True Positive Rate (TPR) · "
+        "Specificity = True Negative Rate (TNR) · "
+        "Brier Score: ↓ lower is better"
+    )
+    # ───────────────────────────────────────────────────────────────────────
 
     st.markdown("---")
-    st.caption("⚠️ For research / educational use only. Not a substitute for medical diagnosis.")
+    st.caption(
+        "⚠️ For research / educational use only. "
+        "Not a substitute for medical diagnosis."
+    )
 
 
 # ── Main content ──────────────────────────────────────────────────────────────
@@ -270,7 +298,7 @@ to detect early Chronic Kidney Disease.
 - 🟢 XGBoost · Gradient Boosting · Random Forest · AdaBoost · SVM
 
 **Evaluation metrics used:**
-- Accuracy, Precision, **Sensitivity** (TPR), **Specificity** (TNR)
+- Accuracy, Precision, **Recall** (TPR), **Specificity** (TNR)
 - F1 Score, ROC-AUC, **Brier Score** (calibration)
         """)
 
