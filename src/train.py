@@ -136,8 +136,8 @@ def _save_metrics_bar_charts(results, model_names, outputs_dir):
 
 def _save_adaboost_metrics_chart(results, outputs_dir):
     """
-    Saves a dedicated performance metrics bar chart
-    for only the AdaBoost model.
+    AdaBoost-only metrics plot
+    including Brier Score
     """
     model_name = "AdaBoost"
 
@@ -145,59 +145,50 @@ def _save_adaboost_metrics_chart(results, outputs_dir):
         "Accuracy",
         "Precision",
         "Recall",
-        "Specificity",
         "F1 Score",
-        "ROC-AUC"
+        "ROC-AUC",
+        "Brier Score"
     ]
 
     BAR_COLORS = [
         "#4C72B0",
         "#55A868",
         "#C44E52",
-        "#8172B2",
         "#CCB974",
-        "#64B5CD"
+        "#64B5CD",
+        "#F39C12"
     ]
 
     vals = [results[model_name][m] for m in METRIC_KEYS]
 
-    fig, ax = plt.subplots(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=(12, 4))
 
     bars = ax.bar(
         METRIC_KEYS,
         vals,
         color=BAR_COLORS,
-        width=0.6,
+        width=0.55,
         edgecolor="white",
         linewidth=0.8
     )
 
-    ax.set_title(
-        "AdaBoost Model Performance Metrics",
-        fontsize=14,
-        fontweight="bold"
-    )
-
+    ax.set_title("AdaBoost", fontsize=16, fontweight="bold")
     ax.set_ylabel("Score (%)")
-    ax.set_ylim(0, 115)
-    ax.tick_params(axis="x", rotation=25)
+    ax.set_xlabel("Metric")
+    ax.set_ylim(0, 110)
 
-    ax.axhline(
-        y=90,
-        color="gray",
-        linestyle="--",
-        linewidth=0.8,
-        alpha=0.6
-    )
+    ax.tick_params(axis="x", rotation=20)
 
-    for bar, val in zip(bars, vals):
+    for bar, val, metric in zip(bars, vals, METRIC_KEYS):
+        label = f"{val:.4f}" if metric == "Brier Score" else f"{val:.1f}%"
+
         ax.text(
             bar.get_x() + bar.get_width() / 2,
             bar.get_height() + 1,
-            f"{val:.2f}%",
+            label,
             ha="center",
             va="bottom",
-            fontsize=9
+            fontsize=10
         )
 
     plt.tight_layout()
@@ -210,7 +201,7 @@ def _save_adaboost_metrics_chart(results, outputs_dir):
     plt.savefig(path, dpi=150, bbox_inches="tight")
     plt.close()
 
-    print(f"  ✔  Saved AdaBoost plot: {path}")
+    print(f"  ✔  Saved: {path}")
 
 def _save_brier_score_chart(results, model_names, outputs_dir):
     """Separate bar chart for Brier Score (calibration) — lower is better."""
