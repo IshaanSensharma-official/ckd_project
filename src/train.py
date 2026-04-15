@@ -2,13 +2,13 @@
 train.py  [UPDATED]
 ────────────────────
 Changes vs original:
-- Recall  → renamed to Sensitivity (same formula: TP / (TP + FN))
+- Recall  → renamed to recall (same formula: TP / (TP + FN))
 - Added   Specificity  = TN / (TN + FP)
 - Added   Brier Score  = calibration quality (lower is better; 0 = perfect)
 - Added   calibration_curves.png  plot (reliability diagram for all 5 models)
 - Updated bar charts    to show all 8 metrics
 - Updated comparison table to show all 8 metrics
-- results_df now carries Sensitivity, Specificity, Brier Score columns
+- results_df now carries recall, Specificity, Brier Score columns
 
 Run from project root:
     python -m src.train
@@ -74,7 +74,7 @@ def build_models():
 def evaluate(model, X_test, y_test):
     """
     Returns y_pred, y_proba, and a metrics dict with 8 metrics:
-      Accuracy, Precision, Sensitivity (=Recall), Specificity,
+      Accuracy, Precision, Recall (=recall), Specificity,
       F1 Score, ROC-AUC, Brier Score
     """
     y_pred  = model.predict(X_test)
@@ -85,14 +85,14 @@ def evaluate(model, X_test, y_test):
     # For binary: [[TN, FP], [FN, TP]]
     TN, FP, FN, TP = cm.ravel()
 
-    sensitivity  = round(TP / (TP + FN) * 100, 2) if (TP + FN) > 0 else 0.0   # = Recall
+    recall  = round(TP / (TP + FN) * 100, 2) if (TP + FN) > 0 else 0.0   # = Recall
     specificity  = round(TN / (TN + FP) * 100, 2) if (TN + FP) > 0 else 0.0
     brier        = round(brier_score_loss(y_test, y_proba), 4)                  # lower = better
 
     metrics = {
         "Accuracy"   : round(accuracy_score(y_test, y_pred)                   * 100, 2),
         "Precision"  : round(precision_score(y_test, y_pred, zero_division=0) * 100, 2),
-        "Sensitivity": sensitivity,   # True Positive Rate
+        "Recall": recall,   # True Positive Rate
         "Specificity": specificity,   # True Negative Rate
         "F1 Score"   : round(f1_score(y_test, y_pred, zero_division=0)        * 100, 2),
         "ROC-AUC"    : round(roc_auc_score(y_test, y_proba)                   * 100, 2),
@@ -105,12 +105,12 @@ def evaluate(model, X_test, y_test):
 
 def _save_metrics_bar_charts(results, model_names, outputs_dir):
     """Bar chart for 6 percentage metrics (excludes Brier Score which has different scale)."""
-    METRIC_KEYS = ["Accuracy", "Precision", "Sensitivity", "Specificity", "F1 Score", "ROC-AUC"]
+    METRIC_KEYS = ["Accuracy", "Precision", "Recall", "Specificity", "F1 Score", "ROC-AUC"]
     BAR_COLORS  = ["#4C72B0", "#55A868", "#C44E52", "#8172B2", "#CCB974", "#64B5CD"]
 
     fig, axes = plt.subplots(3, 2, figsize=(14, 16))
     fig.suptitle("CKD Detection — Per-Model Performance Metrics",
-                 fontsize=16, fontweight="bold", y=1.01)
+                fontsize=16, fontweight="bold", y=1.01)
     axes = axes.flatten()
 
     for idx, name in enumerate(model_names):
@@ -189,20 +189,22 @@ def _save_calibration_curves(proba_scores, y_test, model_names, outputs_dir):
     print(f"  ✔  Saved: {path}")
 
 
-def _save_sensitivity_specificity_chart(results, model_names, outputs_dir):
-    """Side-by-side bar chart comparing Sensitivity vs Specificity per model."""
+# Updated section from train.py — only change made: sensitivity -> Recall consistency
+
+def _save_recall_specificity_chart(results, model_names, outputs_dir):
+    """Side-by-side bar chart comparing Recall vs Specificity per model."""
     x        = np.arange(len(model_names))
     width    = 0.35
-    sens     = [results[n]["Sensitivity"] for n in model_names]
+    rec      = [results[n]["Recall"] for n in model_names]
     spec     = [results[n]["Specificity"] for n in model_names]
 
     fig, ax = plt.subplots(figsize=(11, 6))
-    bars1 = ax.bar(x - width/2, sens, width, label="Sensitivity (TPR)", color="#C44E52",
+    bars1 = ax.bar(x - width/2, rec, width, label="Recall (TPR)", color="#C44E52",
                    edgecolor="white", linewidth=0.8)
     bars2 = ax.bar(x + width/2, spec, width, label="Specificity (TNR)", color="#4C72B0",
                    edgecolor="white", linewidth=0.8)
 
-    ax.set_title("Sensitivity vs Specificity — All Models",
+    ax.set_title("Recall vs Specificity — All Models",
                  fontsize=13, fontweight="bold")
     ax.set_ylabel("Score (%)")
     ax.set_xticks(x)
@@ -219,10 +221,11 @@ def _save_sensitivity_specificity_chart(results, model_names, outputs_dir):
                 f"{bar.get_height():.1f}%", ha="center", va="bottom", fontsize=9)
 
     plt.tight_layout()
-    path = os.path.join(outputs_dir, "sensitivity_specificity.png")
+    path = os.path.join(outputs_dir, "recall_specificity.png")
     plt.savefig(path, dpi=150, bbox_inches="tight")
     plt.close()
     print(f"  ✔  Saved: {path}")
+
 
 
 def _save_roc_curves(results, proba_scores, y_test, model_names, outputs_dir):
@@ -235,7 +238,7 @@ def _save_roc_curves(results, proba_scores, y_test, model_names, outputs_dir):
     ax.plot([0, 1], [0, 1], "k--", lw=1.2, label="Random (50%)")
     ax.set(xlim=[0, 1], ylim=[0, 1.05],
            xlabel="False Positive Rate (1 - Specificity)",
-           ylabel="True Positive Rate (Sensitivity)",
+           ylabel="True Positive Rate (recall)",
            title="ROC Curves — All Models")
     ax.legend(loc="lower right", fontsize=10)
     ax.grid(True, alpha=0.3)
@@ -268,7 +271,7 @@ def _save_confusion_matrices(predictions, y_test, model_names, outputs_dir):
 
 def _save_comparison_table(results_df, outputs_dir):
     """Full 8-metric ranked comparison table."""
-    METRIC_KEYS = ["Accuracy", "Precision", "Sensitivity", "Specificity",
+    METRIC_KEYS = ["Accuracy", "Precision", "Recall", "Specificity",
                 "F1 Score", "ROC-AUC", "Brier Score"]
 
     fig, ax = plt.subplots(figsize=(16, 4))
@@ -347,7 +350,7 @@ def train_and_save(data_path=DATA_PATH, models_dir=MODELS_DIR, outputs_dir=OUTPU
 
         print(f"    Acc={metrics['Accuracy']:.2f}%  "
               f"Prec={metrics['Precision']:.2f}%  "
-              f"Sens={metrics['Sensitivity']:.2f}%  "
+              f"Recall={metrics['Recall']:.2f}%  "
               f"Spec={metrics['Specificity']:.2f}%  "
               f"F1={metrics['F1 Score']:.2f}%  "
               f"AUC={metrics['ROC-AUC']:.2f}%  "
@@ -359,7 +362,7 @@ def train_and_save(data_path=DATA_PATH, models_dir=MODELS_DIR, outputs_dir=OUTPU
 
     model_names = list(models.keys())
     results_df  = pd.DataFrame(results).T.reset_index()
-    results_df.columns = ["Model", "Accuracy", "Precision", "Sensitivity",
+    results_df.columns = ["Model", "Accuracy", "Precision", "Recall",
                            "Specificity", "F1 Score", "ROC-AUC", "Brier Score"]
     results_df = results_df.sort_values("F1 Score", ascending=False).reset_index(drop=True)
     results_df.index += 1
@@ -376,7 +379,7 @@ def train_and_save(data_path=DATA_PATH, models_dir=MODELS_DIR, outputs_dir=OUTPU
     print("─" * 65)
 
     _save_metrics_bar_charts(results, model_names, outputs_dir)
-    _save_sensitivity_specificity_chart(results, model_names, outputs_dir)  # NEW
+    _save_recall_specificity_chart(results, model_names, outputs_dir)  # NEW
     _save_brier_score_chart(results, model_names, outputs_dir)               # NEW
     _save_calibration_curves(proba_scores, y_test, model_names, outputs_dir) # NEW
     _save_roc_curves(results, proba_scores, y_test, model_names, outputs_dir)
