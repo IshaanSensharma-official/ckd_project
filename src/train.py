@@ -134,6 +134,84 @@ def _save_metrics_bar_charts(results, model_names, outputs_dir):
     print(f"  ✔  Saved: {path}")
 
 
+def _save_adaboost_metrics_chart(results, outputs_dir):
+    """
+    Saves a dedicated performance metrics bar chart
+    for only the AdaBoost model.
+    """
+    model_name = "AdaBoost"
+
+    METRIC_KEYS = [
+        "Accuracy",
+        "Precision",
+        "Recall",
+        "Specificity",
+        "F1 Score",
+        "ROC-AUC"
+    ]
+
+    BAR_COLORS = [
+        "#4C72B0",
+        "#55A868",
+        "#C44E52",
+        "#8172B2",
+        "#CCB974",
+        "#64B5CD"
+    ]
+
+    vals = [results[model_name][m] for m in METRIC_KEYS]
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    bars = ax.bar(
+        METRIC_KEYS,
+        vals,
+        color=BAR_COLORS,
+        width=0.6,
+        edgecolor="white",
+        linewidth=0.8
+    )
+
+    ax.set_title(
+        "AdaBoost Model Performance Metrics",
+        fontsize=14,
+        fontweight="bold"
+    )
+
+    ax.set_ylabel("Score (%)")
+    ax.set_ylim(0, 115)
+    ax.tick_params(axis="x", rotation=25)
+
+    ax.axhline(
+        y=90,
+        color="gray",
+        linestyle="--",
+        linewidth=0.8,
+        alpha=0.6
+    )
+
+    for bar, val in zip(bars, vals):
+        ax.text(
+            bar.get_x() + bar.get_width() / 2,
+            bar.get_height() + 1,
+            f"{val:.2f}%",
+            ha="center",
+            va="bottom",
+            fontsize=9
+        )
+
+    plt.tight_layout()
+
+    path = os.path.join(
+        outputs_dir,
+        "adaboost_performance_metrics.png"
+    )
+
+    plt.savefig(path, dpi=150, bbox_inches="tight")
+    plt.close()
+
+    print(f"  ✔  Saved AdaBoost plot: {path}")
+
 def _save_brier_score_chart(results, model_names, outputs_dir):
     """Separate bar chart for Brier Score (calibration) — lower is better."""
     scores = [results[n]["Brier Score"] for n in model_names]
@@ -379,9 +457,10 @@ def train_and_save(data_path=DATA_PATH, models_dir=MODELS_DIR, outputs_dir=OUTPU
     print("─" * 65)
 
     _save_metrics_bar_charts(results, model_names, outputs_dir)
-    _save_recall_specificity_chart(results, model_names, outputs_dir)  # NEW
-    _save_brier_score_chart(results, model_names, outputs_dir)               # NEW
-    _save_calibration_curves(proba_scores, y_test, model_names, outputs_dir) # NEW
+    _save_adaboost_metrics_chart(results, outputs_dir)
+    _save_recall_specificity_chart(results, model_names, outputs_dir)
+    _save_brier_score_chart(results, model_names, outputs_dir)
+    _save_calibration_curves(proba_scores, y_test, model_names, outputs_dir)
     _save_roc_curves(results, proba_scores, y_test, model_names, outputs_dir)
     _save_confusion_matrices(predictions, y_test, model_names, outputs_dir)
     _save_comparison_table(results_df, outputs_dir)
