@@ -1,10 +1,3 @@
-"""
-predict.py
-──────────
-Inference module — loads any saved model and runs a single-patient
-prediction. Used by the Streamlit app.
-"""
-
 import os
 import joblib
 import numpy as np
@@ -56,25 +49,7 @@ def get_best_model_name(models_dir: str = MODELS_DIR) -> str:
 
 def predict_patient(patient_dict: dict, model_name: str = None,
                     models_dir: str = MODELS_DIR) -> dict:
-    """
-    Full inference pipeline for a single patient.
 
-    Parameters
-    ----------
-    patient_dict : dict   – raw feature values keyed by column name
-    model_name   : str    – one of MODEL_FILES keys; if None, uses best model
-
-    Returns
-    -------
-    dict with keys:
-        prediction      – 0 (No CKD) or 1 (CKD)
-        label           – "CKD Detected" / "No CKD Detected"
-        confidence      – probability for the predicted class (0–1)
-        ckd_probability – raw CKD (class=1) probability
-        model_used      – name of model that ran inference
-        clinical_flags  – list of abnormal lab findings
-        risk_level      – "High" / "Moderate" / "Low"
-    """
     scaler, feature_cols = load_scaler_and_metadata(models_dir)
 
     if model_name is None:

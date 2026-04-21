@@ -1,19 +1,3 @@
-"""
-train.py  [UPDATED]
-────────────────────
-Changes vs original:
-- Recall  → renamed to recall (same formula: TP / (TP + FN))
-- Added   Specificity  = TN / (TN + FP)
-- Added   Brier Score  = calibration quality (lower is better; 0 = perfect)
-- Added   calibration_curves.png  plot (reliability diagram for all 5 models)
-- Updated bar charts    to show all 8 metrics
-- Updated comparison table to show all 8 metrics
-- results_df now carries recall, Specificity, Brier Score columns
-
-Run from project root:
-    python -m src.train
-"""
-
 import os
 import warnings
 warnings.filterwarnings("ignore")
@@ -101,7 +85,7 @@ def evaluate(model, X_test, y_test):
     return y_pred, y_proba, metrics
 
 
-# ── Plotting helpers ──────────────────────────────────────────────────────────
+# ── Plotting helpers 
 
 def _save_metrics_bar_charts(results, model_names, outputs_dir):
     """Bar chart for 6 percentage metrics (excludes Brier Score which has different scale)."""
